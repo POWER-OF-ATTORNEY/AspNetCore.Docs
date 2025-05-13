@@ -1,11 +1,11 @@
 ---
 title: WebSockets support in ASP.NET Core
 author: wadepickett
-description: Learn how to get started with WebSockets in ASP.NET Core.
+description: Learn how to use WebSockets in ASP.NET Core to enable real-time communication in your apps. Follow this guide to quickly configure and implement WebSockets.
 monikerRange: '>= aspnetcore-3.1'
 ms.author: wpickett
 ms.custom: mvc
-ms.date: 04/23/2024
+ms.date: 05/06/2025
 uid: fundamentals/websockets
 ---
 # WebSockets support in ASP.NET Core
@@ -18,7 +18,7 @@ This article explains how to get started with WebSockets in ASP.NET Core. [WebSo
 
 [View or download sample code](https://github.com/dotnet/AspNetCore.Docs/tree/main/aspnetcore/fundamentals/websockets/samples) ([how to download](xref:index#how-to-download-a-sample), [how to run](#sample-app)).
 
-## Http/2 WebSockets support
+## HTTP/2 WebSockets support
 
 Using WebSockets over HTTP/2 takes advantage of new features such as:
 
@@ -33,9 +33,9 @@ These supported features are available in Kestrel on all HTTP/2 enabled platform
 > HTTP/2 WebSockets use CONNECT requests rather than GET, so your own routes and controllers may need updating.
 > For more information, see [Add HTTP/2 WebSockets support for existing controllers](#add-http2-websockets-support-for-existing-controllers) in this article.
 >
-> Chrome and Edge have HTTP/2 WebSockets enabled by default, and you can enable it in FireFox on the `about:config` page with the `network.http.spdy.websockets` flag.
+> Chrome and Microsoft Edge have HTTP/2 WebSockets enabled by default, and you can enable it in FireFox on the `about:config` page with the `network.http.spdy.websockets` flag.
 
-WebSockets were originally designed for HTTP/1.1 but have since been adapted to work over HTTP/2. ([RFC 8441](https://www.rfc-editor.org/rfc/rfc8441))
+WebSockets were originally designed for HTTP/1.1 but later adapted to work over HTTP/2. ([RFC 8441](https://www.rfc-editor.org/rfc/rfc8441))
 
 ## SignalR
 
@@ -56,17 +56,17 @@ For some apps, [gRPC on .NET](xref:grpc/index) provides an alternative to WebSoc
 
 ## Prerequisites
 
-* Any OS that supports ASP.NET Core:  
+* Supported on any OS that supports ASP.NET Core:  
   * Windows 7 / Windows Server 2008 or later
   * Linux
   * macOS  
-* If the app runs on Windows with IIS:
+* Supported on Windows with IIS:
   * Windows 8 / Windows Server 2012 or later
   * IIS 8 / IIS 8 Express
   * WebSockets must be enabled. See the [IIS/IIS Express support](#iisiis-express-support) section.  
-* If the app runs on [HTTP.sys](xref:fundamentals/servers/httpsys):
+* Supported on [HTTP.sys](xref:fundamentals/servers/httpsys):
   * Windows 8 / Windows Server 2012 or later
-* For supported browsers, see [Can I use](https://caniuse.com/?search=websockets).
+* Supported browsers: See [Can I use](https://caniuse.com/?search=websockets).
 
 ## Configure the middleware
 
@@ -83,7 +83,7 @@ The following settings can be configured:
 
 ## Accept WebSocket requests
 
-Somewhere later in the request life cycle (later in `Program.cs` or in an action method, for example) check if it's a WebSocket request and accept the WebSocket request.
+Later in the request life cycle, such as in `Program.cs` or an action method, check if it's a WebSocket request and accept it.  
 
 The following example is from later in `Program.cs`:
 
@@ -121,7 +121,7 @@ Never use `Task.Wait`, `Task.Result`, or similar blocking calls to wait for the 
 > [!WARNING]
 > Enabling compression over encrypted connections can make an app subject to CRIME/BREACH attacks.
 > If sending sensitive information, avoid enabling compression or use `WebSocketMessageFlags.DisableCompression` when calling `WebSocket.SendAsync`.
-> This applies to both sides of the WebSocket. Note that the WebSockets API in the browser doesn't have configuration for disabling compression per send.
+> This applies to both sides of the WebSocket. The WebSockets API in the browser doesn't have configuration for disabling compression per send.
 
 If compression of messages over WebSockets is desired, then the accept code must specify that it allows compression as follows:
 
@@ -138,7 +138,7 @@ using (var webSocket = await context.WebSockets.AcceptWebSocketAsync(
 Compression is negotiated between the client and server when first establishing a connection. You can read more about the negotiation in the [Compression Extensions for WebSocket RFC](https://datatracker.ietf.org/doc/html/rfc7692#section-7).
 
 > [!NOTE]
-> If the compression negotiation isn't accepted by either the server or client, the connection is still established. However, the connection doesn't use compression when sending and receiving messages.
+> If the server or client doesn't accept the compression negotiation, the connection is still established but doesn't use compression to send and receive messages.
 
 ## Send and receive messages
 
@@ -154,13 +154,34 @@ When accepting the WebSocket connection before beginning the loop, the middlewar
 
 The server isn't automatically informed when the client disconnects due to loss of connectivity. The server receives a disconnect message only if the client sends it, which can't be done if the internet connection is lost. If you want to take some action when that happens, set a timeout after nothing is received from the client within a certain time window.
 
-If the client isn't always sending messages and you don't want to time out just because the connection goes idle, have the client use a timer to send a ping message every X seconds. On the server, if a message hasn't arrived within 2\*X seconds after the previous one, terminate the connection and report that the client disconnected. Wait for twice the expected time interval to leave extra time for network delays that might hold up the ping message.
+If the client isn't always sending messages and you don't want to time out just because the connection goes idle, have the client use a timer to send a ping message every X seconds. On the server, if a message doesn't arrive within 2*X seconds after the previous one, terminate the connection and report that the client disconnected. Wait for twice the expected time interval to leave extra time for network delays that might hold up the ping message.
+
+### Keep-Alive Timeout for WebSockets
+
+The [WebSockets middleware]([request streaming](xref:fundamentals/websockets#configure-the-middleware) can be configured for keep-alive timeouts, introduced with ASP.NET 9.0.
+
+The keep-alive timeout aborts the WebSocket connection and throws an exception from `WebSocket.ReceiveAsync` if both of the following conditions are met:
+
+* The server sends a ping frame using the websocket protocol.
+* The client doesn't reply with a pong frame within the specified timeout.
+
+The server automatically sends the ping frame and configures it with `KeepAliveInterval`. 
+
+The keep-alive timeout setting is useful for detecting connections that might be slow or ungracefully disconnected.
+
+The keep-alive timeout can be configured globally for the WebSocket middleware:
+
+[!code-csharp[](~fundamentals/websockets/samples/9.x/WebSocketsKeepAliveTimeoutExample/Program.cs?name=snippet_WebSocket_KeepAliveTimeout_Global)]
+
+Or configured per accepted WebSocket:
+
+[!code-csharp[](~fundamentals/websockets/samples/9.x/WebSocketsKeepAliveTimeoutExample/Program.cs?name=snippet_KeepAliveTimeout_Per_Accepted_WebSocket)]
 
 ## WebSocket origin restriction
 
 The protections provided by CORS don't apply to WebSockets. Browsers do **not**:
 
-* Perform CORS pre-flight requests.
+* Perform CORS preflight requests.
 * Respect the restrictions specified in `Access-Control` headers when making WebSocket requests.
 
 However, browsers do send the `Origin` header when issuing WebSocket requests. Applications should be configured to validate these headers to ensure that only WebSockets coming from the expected origins are allowed.
@@ -184,7 +205,7 @@ Windows Server 2012 or later and Windows 8 or later with IIS/IIS Express 8 or la
 To enable support for the WebSocket protocol on Windows Server 2012 or later:
 
 > [!NOTE]
-> These steps are not required when using IIS Express
+> These steps aren't required when using IIS Express
 
 1. Use the **Add Roles and Features** wizard from the **Manage** menu or the link in **Server Manager**.
 1. Select **Role-based or Feature-based Installation**. Select **Next**.
@@ -198,7 +219,7 @@ To enable support for the WebSocket protocol on Windows Server 2012 or later:
 To enable support for the WebSocket protocol on Windows 8 or later:
 
 > [!NOTE]
-> These steps are not required when using IIS Express
+> These steps aren't required when using IIS Express
 
 1. Navigate to **Control Panel** > **Programs** > **Programs and Features** > **Turn Windows features on or off** (left side of the screen).
 1. Open the following nodes: **Internet Information Services** > **World Wide Web Services** > **Application Development Features**.
