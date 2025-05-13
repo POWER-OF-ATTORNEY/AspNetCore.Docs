@@ -296,6 +296,7 @@ public class CustomAuthorizationMessageHandler : AuthorizationMessageHandler
         ConfigureHandler(
             authorizedUrls: [ "https://api.contoso.com/v1.0" ],
             scopes: [ "example.read", "example.write" ]);
+        InnerHandler = new HttpClientHandler();
     }
 }
 ```
